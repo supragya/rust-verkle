@@ -57,7 +57,7 @@ pub fn create_verifier_queries(
     for (key, value) in keys.into_iter().zip(values) {
         let stem: [u8; 31] = key[0..31].try_into().unwrap();
         if !depths_and_ext_by_stem.contains_key(&stem) {
-            return Err(())
+            return Err(());
         }
         let (extpres, depth) = depths_and_ext_by_stem[&stem];
 

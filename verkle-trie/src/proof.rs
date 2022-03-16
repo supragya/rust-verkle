@@ -237,7 +237,7 @@ impl VerkleProof {
         let proof = self.proof.clone();
         let queries_update_hint = verifier::create_verifier_queries(self, keys, values, root);
         if queries_update_hint.is_err() {
-            return (false, None)
+            return (false, None);
         }
 
         let (queries, update_hint) = match queries_update_hint.unwrap() {

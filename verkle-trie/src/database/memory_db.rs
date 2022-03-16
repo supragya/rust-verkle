@@ -1,6 +1,8 @@
 use super::{BranchChild, Flush, ReadOnlyHigherDb, WriteOnlyHigherDb};
 use crate::database::{BranchMeta, StemMeta};
-use std::{collections::HashMap, convert::TryInto};
+use std::{collections::{HashMap, HashSet}, convert::TryInto};
+extern crate queues;
+use queues::*;
 
 #[derive(Debug, Clone)]
 pub struct MemoryDb {
@@ -30,18 +32,104 @@ impl MemoryDb {
     }
 
     pub fn to_dot(&self, file: &str) {
-        const lbbox: &str = "fillcolor=\"#bbbbff\"\nstyle=\"filled\"\nshape=\"box\"\n";
+        const lrbox: &str = "fillcolor=\"#ffdddd\"\nstyle=\"filled\"\nshape=\"box\"\n";
+        const lbbox: &str = "fillcolor=\"#ddddff\"\nstyle=\"filled\"\nshape=\"box\"\n";
         const lgbox: &str = "fillcolor=\"#90ff90\"\nstyle=\"filled\"\nshape=\"box\"\n";
         const ylbox: &str = "fillcolor=\"yellow\"\nstyle=\"filled\"\nshape=\"box\"\n";
 
+        let root = hex::decode("00000000000000000000000000000000").unwrap();
+
         // Dot gen
         let mut dot = "digraph D {\n".to_string();
-        dot = dot + format!("{} [{}label=\"{}\"]\n", "root", lbbox, "hello world").as_str(); 
+        let mut root_commitment: String = "".to_string();
+        let root_meta = self.branch_table.get(&vec![]);
+        if let Some(BranchChild::Branch(x)) = root_meta {
+            root_commitment = x.hash_commitment.to_string().replace("\"", "'");
+        }
+
+        let mut queue: Queue<(Option<Vec<u8>>, Vec<u8>)> = queue![(None, vec![])];
+        while queue.size() > 0 {
+            let node = queue.remove().unwrap();
+            if node.0 == None {
+                dot = dot + format!("{} [{}label=\"{}\"]\n", "root", lrbox, format!(
+                    "ID: '{}'\nrootcomm: '{}'",
+                    "root",
+                    root_commitment,
+                )).as_str();
+            } else {
+                let mut parent = "n".to_string() + hex::encode(node.0.unwrap()).as_str();
+                if parent == "n".to_string() {
+                    parent = "root".to_string();
+                }
+                let me = "n".to_string() + hex::encode(node.1.clone()).as_str();
+                let branchinfo = self.branch_table.get(&node.1).unwrap();
+                match branchinfo {
+                    &BranchChild::Branch(x) => {
+                        // Internal node
+                        let mut stem: [u8; 31] = Default::default();
+                        for i in 0..31 {
+                            if i < node.1.len() {
+                                stem[i] = node.1[i]
+                            } else {
+                                stem[i] = 0
+                            }
+                        }
+                        // println!("stem {:?}", stem);
+                        // println!("stem table {:?}", self.stem_table);
+                        let info = self.stem_table.get(&stem).unwrap();
+                        // node creation
+                        dot = dot
+                        + format!(
+                            "{} [{}label=\"{}\"]\n{} -> {}\n",
+                            me,
+                            lbbox,
+                            format!(
+                                "InternalNode: '{}'\ncomm: '{}'\nC1: '{}'\nC2: '{}'",
+                                me,
+                                x.commitment.to_string().replace("\"", "'"),
+                                info.hash_c1.to_string().replace("\"", "'"),
+                                info.hash_c2.to_string().replace("\"", "'")
+                            ),
+                            parent,
+                            me
+                        ).as_str()
+                    }
+                    &BranchChild::Stem(x) => {
+                        // Leaf node
+                        let mut hack: [u8; 32] = Default::default();
+                        for i in 0..31 {
+                            hack[i] = x[i];
+                        }
+                        let val = hex::encode(self.leaf_table.get(&hack).unwrap());
+                        dot = dot
+                        + format!(
+                            "{} [{}label=\"{}\"]\n{} -> {}\n",
+                            me,
+                            lgbox,
+                            format!(
+                                "LeafNode: '{}'\nVal: '{}'",
+                                me,
+                                val,
+                            ),
+                            parent,
+                            me
+                        )
+                        .as_str();
+                    }
+                }
+            }
+            let children = self.get_branch_children(&node.1.clone()[..]);
+            for child in children {
+                let parent = Some(node.1.clone());
+                let mut child_vec = node.1.clone();
+                child_vec.append(&mut vec![child.0]);
+                queue.add((parent, child_vec)).unwrap();
+            }
+        }
         dot = dot + "}\n";
 
         // Dot save
-        std::fs::write(file, dot)
-        .expect(format!("Unable to write file: {}", file).as_str());
+        std::fs::write(file, dot).expect(format!("Unable to write file: {}", file).as_str());
     }
 }
 

@@ -768,8 +768,8 @@ mod tests {
     use crate::database::memory_db::MemoryDb;
     use crate::database::ReadOnlyHigherDb;
     use crate::trie::Trie;
-    use crate::{TrieTrait, VerkleConfig};
     use crate::{group_to_field, TestConfig};
+    use crate::{TrieTrait, VerkleConfig};
 
     #[test]
     // Inserting where the key and value are all zeros
@@ -1196,5 +1196,4 @@ mod tests {
         let val = trie.get(tree_key_code_keccak).unwrap();
         let val = trie.get(tree_key_code_size).unwrap();
     }
-
 }
