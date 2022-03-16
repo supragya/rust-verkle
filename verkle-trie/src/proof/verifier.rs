@@ -18,7 +18,7 @@ pub fn create_verifier_queries(
     keys: Vec<[u8; 32]>,
     values: Vec<Option<[u8; 32]>>,
     root: EdwardsProjective,
-) -> Option<(Vec<VerifierQuery>, UpdateHint)> {
+) -> Result<Option<(Vec<VerifierQuery>, UpdateHint)>, ()> {
     let commitments_sorted_by_path: Vec<_> =
         std::iter::once(root).chain(proof.comms_sorted).collect();
 
@@ -56,6 +56,9 @@ pub fn create_verifier_queries(
 
     for (key, value) in keys.into_iter().zip(values) {
         let stem: [u8; 31] = key[0..31].try_into().unwrap();
+        if !depths_and_ext_by_stem.contains_key(&stem) {
+            return Err(())
+        }
         let (extpres, depth) = depths_and_ext_by_stem[&stem];
 
         // Add branch node information, we know that if the stem has depth `d`
@@ -108,7 +111,7 @@ pub fn create_verifier_queries(
                 // Since this stem points to a different stem,
                 // the value was never set
                 if value.is_some() {
-                    return None;
+                    return Ok(None);
                 }
 
                 // Check if this stem already has an extension proof
@@ -162,7 +165,7 @@ pub fn create_verifier_queries(
         } else if extpres == ExtPresent::None {
             // If the extension was not present, then the value should be None
             if value.is_some() {
-                return None;
+                return Ok(None);
             }
 
             //TODO: we may need to rewrite the prover/verifier algorithm to fix this if statement properly.
@@ -232,5 +235,5 @@ pub fn create_verifier_queries(
         other_stems_by_prefix,
     };
 
-    Some((queries, update_hint))
+    Ok(Some((queries, update_hint)))
 }

@@ -28,6 +28,21 @@ impl MemoryDb {
         self.stem_table.clear();
         self.branch_table.clear();
     }
+
+    pub fn to_dot(&self, file: &str) {
+        const lbbox: &str = "fillcolor=\"#bbbbff\"\nstyle=\"filled\"\nshape=\"box\"\n";
+        const lgbox: &str = "fillcolor=\"#90ff90\"\nstyle=\"filled\"\nshape=\"box\"\n";
+        const ylbox: &str = "fillcolor=\"yellow\"\nstyle=\"filled\"\nshape=\"box\"\n";
+
+        // Dot gen
+        let mut dot = "digraph D {\n".to_string();
+        dot = dot + format!("{} [{}label=\"{}\"]\n", "root", lbbox, "hello world").as_str(); 
+        dot = dot + "}\n";
+
+        // Dot save
+        std::fs::write(file, dot)
+        .expect(format!("Unable to write file: {}", file).as_str());
+    }
 }
 
 impl ReadOnlyHigherDb for MemoryDb {

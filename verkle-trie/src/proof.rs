@@ -236,8 +236,11 @@ impl VerkleProof {
         // TODO here and sending the rest of the struct to create_verifier_queries
         let proof = self.proof.clone();
         let queries_update_hint = verifier::create_verifier_queries(self, keys, values, root);
+        if queries_update_hint.is_err() {
+            return (false, None)
+        }
 
-        let (queries, update_hint) = match queries_update_hint {
+        let (queries, update_hint) = match queries_update_hint.unwrap() {
             Some((queries, update_hint)) => (queries, update_hint),
             None => return (false, None),
         };

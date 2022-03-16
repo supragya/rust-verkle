@@ -43,6 +43,8 @@ pub trait TrieTrait {
     /// Creates a verkle proof over many keys
     /// TODO: This will return a Result in the future
     fn create_verkle_proof(&self, key: impl Iterator<Item = Key>) -> proof::VerkleProof;
+
+    // fn to_dot() -> String;
 }
 
 pub(crate) fn group_to_field(point: &EdwardsProjective) -> Fr {

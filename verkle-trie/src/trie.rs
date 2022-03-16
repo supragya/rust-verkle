@@ -8,7 +8,7 @@ use bandersnatch::{EdwardsProjective, Fr};
 #[derive(Debug, Clone)]
 // The trie implements the logic to insert values, fetch values, and create paths to said values
 pub struct Trie<Storage, PolyCommit: Committer> {
-    pub(crate) storage: Storage,
+    pub storage: Storage,
     committer: PolyCommit,
 }
 
