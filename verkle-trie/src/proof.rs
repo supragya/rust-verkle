@@ -52,13 +52,13 @@ pub struct VerificationHint {
 impl std::fmt::Display for VerificationHint {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for d in &self.depths {
-            write!(f, "{} ", d)?;
+            writeln!(f, "depth: {} ", d)?;
         }
         for e in &self.extension_present {
-            write!(f, "{:?} ", e)?;
+            writeln!(f, "expresent: {:?} ", e)?;
         }
         for s in &self.diff_stem_no_proof {
-            write!(f, "{} ", hex::encode(s));
+            writeln!(f, "diffstem_no_proof: {} ", hex::encode(s))?;
         }
         std::fmt::Result::Ok(())
     }
@@ -258,15 +258,17 @@ impl VerkleProof {
 impl std::fmt::Display for VerkleProof {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "Verkle proof:");
-        writeln!(f, " * verification hints: {}", self.verification_hint)?;
-        write!(f, " * commitments: ")?;
+        writeln!(f, " * verification hints: \n{}", self.verification_hint)?;
+        write!(f, " * commitments: \n")?;
         for comm in self.comms_sorted.iter().map(|comm| {
             let mut comm_serialised = [0u8; 32];
-            comm.serialize(&mut comm_serialised[..]);
+            comm.serialize(&mut comm_serialised[..]).unwrap();
             hex::encode(comm_serialised)
         }) {
-            write!(f, "{} ", comm)?;
+            write!(f, "\t{}\n", comm)?;
         }
+        writeln!(f, "")?;
+        writeln!(f, " * multipoint g(x) comm: {:?}", self.proof)?;
         std::fmt::Result::Ok(())
     }
 }

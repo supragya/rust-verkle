@@ -2,6 +2,7 @@ use super::{BranchChild, Flush, ReadOnlyHigherDb, WriteOnlyHigherDb};
 use crate::database::{BranchMeta, StemMeta};
 use std::{collections::{HashMap, HashSet}, convert::TryInto};
 extern crate queues;
+use ark_serialize::CanonicalSerialize;
 use queues::*;
 
 #[derive(Debug, Clone)]
@@ -32,10 +33,9 @@ impl MemoryDb {
     }
 
     pub fn to_dot(&self, file: &str) {
-        const lrbox: &str = "fillcolor=\"#ffdddd\"\nstyle=\"filled\"\nshape=\"box\"\n";
-        const lbbox: &str = "fillcolor=\"#ddddff\"\nstyle=\"filled\"\nshape=\"box\"\n";
-        const lgbox: &str = "fillcolor=\"#90ff90\"\nstyle=\"filled\"\nshape=\"box\"\n";
-        const ylbox: &str = "fillcolor=\"yellow\"\nstyle=\"filled\"\nshape=\"box\"\n";
+        const lrbox: &str = "fillcolor=\"#e3dfa4\"\nfontname=\"Courier New\"\nstyle=\"filled\"\nshape=\"box\"\n";
+        const lbbox: &str = "fillcolor=\"#cbf1f7\"\nfontname=\"Courier New\"\nstyle=\"filled\"\nshape=\"box\"\n";
+        const lgbox: &str = "fillcolor=\"#f3f9ed\"\nfontname=\"Courier New\"\nstyle=\"filled\"\nshape=\"box\"\n";
 
         let root = hex::decode("00000000000000000000000000000000").unwrap();
 
@@ -44,7 +44,10 @@ impl MemoryDb {
         let mut root_commitment: String = "".to_string();
         let root_meta = self.branch_table.get(&vec![]);
         if let Some(BranchChild::Branch(x)) = root_meta {
-            root_commitment = x.hash_commitment.to_string().replace("\"", "'");
+            let mut comm_serialised = [0u8; 32];
+            x.commitment.serialize(&mut comm_serialised[..]).unwrap();
+            let comm_str = hex::encode(comm_serialised);
+            root_commitment = comm_str.replace("\"", "'");
         }
 
         let mut queue: Queue<(Option<Vec<u8>>, Vec<u8>)> = queue![(None, vec![])];
@@ -52,8 +55,7 @@ impl MemoryDb {
             let node = queue.remove().unwrap();
             if node.0 == None {
                 dot = dot + format!("{} [{}label=\"{}\"]\n", "root", lrbox, format!(
-                    "ID: '{}'\nrootcomm: '{}'",
-                    "root",
+                    "ROOT\nrootcomm: '{}'",
                     root_commitment,
                 )).as_str();
             } else {
@@ -66,17 +68,10 @@ impl MemoryDb {
                 match branchinfo {
                     &BranchChild::Branch(x) => {
                         // Internal node
-                        let mut stem: [u8; 31] = Default::default();
-                        for i in 0..31 {
-                            if i < node.1.len() {
-                                stem[i] = node.1[i]
-                            } else {
-                                stem[i] = 0
-                            }
-                        }
-                        // println!("stem {:?}", stem);
-                        // println!("stem table {:?}", self.stem_table);
-                        let info = self.stem_table.get(&stem).unwrap();
+                        let mut comm_serialised = [0u8; 32];
+                        x.commitment.serialize(&mut comm_serialised[..]).unwrap();
+                        let comm_str = hex::encode(comm_serialised);
+
                         // node creation
                         dot = dot
                         + format!(
@@ -84,32 +79,53 @@ impl MemoryDb {
                             me,
                             lbbox,
                             format!(
-                                "InternalNode: '{}'\ncomm: '{}'\nC1: '{}'\nC2: '{}'",
+                                "InternalNode: {}\ncomm: {}",
                                 me,
-                                x.commitment.to_string().replace("\"", "'"),
-                                info.hash_c1.to_string().replace("\"", "'"),
-                                info.hash_c2.to_string().replace("\"", "'")
+                                comm_str
                             ),
                             parent,
                             me
                         ).as_str()
                     }
                     &BranchChild::Stem(x) => {
+                        let stem_name = hex::encode(x);
                         // Leaf node
-                        let mut hack: [u8; 32] = Default::default();
+                        let stem_meta = self.stem_table.get(&x).unwrap();
+                        let mut comm_serialised = [0u8; 32];
+                        stem_meta.stem_commitment.serialize(&mut comm_serialised[..]).unwrap();
+                        let comm_str = hex::encode(comm_serialised);
+
+                        let mut c1 = [0u8; 32];
+                        stem_meta.C_1.serialize(&mut c1[..]).unwrap();
+                        let c1_str = hex::encode(c1);
+
+                        let mut c2 = [0u8; 32];
+                        stem_meta.C_2.serialize(&mut c2[..]).unwrap();
+                        let c2_str = hex::encode(c2);
+
+                        let mut leafkey: [u8; 32] = Default::default();
                         for i in 0..31 {
-                            hack[i] = x[i];
+                            leafkey[i] = x[i];
                         }
-                        let val = hex::encode(self.leaf_table.get(&hack).unwrap());
+                        let mut leafvals = String::new();
+                        for last in 0..255 {
+                            leafkey[31] = last;
+                            if let Some(val) = self.leaf_table.get(&leafkey) {
+                                leafvals = leafvals + format!(" [{}] {}\n", leafkey[31], hex::encode(val)).as_str();
+                            }
+                        }
                         dot = dot
                         + format!(
                             "{} [{}label=\"{}\"]\n{} -> {}\n",
                             me,
                             lgbox,
                             format!(
-                                "LeafNode: '{}'\nVal: '{}'",
-                                me,
-                                val,
+                                "ExtNode: '{}'\ncomm: {}\nc1: {}\nc2: {}\nValues:\n{}",
+                                stem_name,
+                                comm_str,
+                                c1_str,
+                                c2_str,
+                                leafvals,
                             ),
                             parent,
                             me

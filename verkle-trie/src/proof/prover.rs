@@ -4,6 +4,7 @@ use crate::{
     database::ReadOnlyHigherDb,
     proof::opening_data::{OpeningData, Openings},
 };
+use ark_serialize::CanonicalSerialize;
 use ipa_multipoint::multiproof::MultiPoint;
 use ipa_multipoint::multiproof::ProverQuery;
 use itertools::Itertools;
@@ -16,6 +17,13 @@ pub fn create_verkle_proof<Storage: ReadOnlyHigherDb>(
     assert!(keys.len() > 0, "cannot create a proof with no keys");
 
     let (queries, verification_hint) = create_prover_queries(storage, keys);
+    print!("queries: ");
+    for x in queries.iter() {
+        let mut comm_serialised = [0u8; 32];
+        x.commitment.serialize(&mut comm_serialised[..]).unwrap();
+        print!("{} ", hex::encode(comm_serialised));
+    }
+    println!("");
 
     // Commitments without duplicates and without the root, (implicitly) sorted by path, since the queries were
     // processed by path order
@@ -72,14 +80,23 @@ pub(super) fn create_prover_queries<Storage: ReadOnlyHigherDb>(
     //Stems that are in the trie, but don't have their own extension proofs
     let mut diff_stem_no_proof = BTreeSet::new();
     for (path, openings) in &openings {
-        match openings {
-            Openings::Suffix(so) => queries.extend(so.open_query(storage)),
-            Openings::Branch(bo) => queries.extend(bo.open_query(path, storage)),
+        let mut prover_q = Vec::new();
+        prover_q = match openings {
+            Openings::Suffix(so) => so.open_query(storage),
+            Openings::Branch(bo) => bo.open_query(path, storage),
             Openings::Extension(eo) => {
                 diff_stem_no_proof.insert(eo.stem);
-                queries.extend(eo.open_query(false, false));
+                eo.open_query(false, false)
             }
+        };
+        print!("\nopenings: {:?}, prover_q: ", openings);
+        for x in prover_q.iter() {
+            let mut comm_serialised = [0u8; 32];
+            x.commitment.serialize(&mut comm_serialised[..]).unwrap();
+            print!("{} ", hex::encode(comm_serialised));
         }
+        println!("\n");
+        queries.extend(prover_q);
     }
 
     // Values to help the verifier reconstruct the trie and verify the proof

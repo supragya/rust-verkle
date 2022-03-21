@@ -5,6 +5,7 @@ use crate::{
     proof::key_path_finder::{KeyNotFound, KeyPathFinder, KeyState},
 };
 use ark_ff::{One, PrimeField, Zero};
+use ark_serialize::CanonicalSerialize;
 use bandersnatch::Fr;
 use ipa_multipoint::lagrange_basis::LagrangeBasis;
 use ipa_multipoint::multiproof::{ProverQuery, VerifierQuery};
@@ -286,11 +287,19 @@ impl SuffixOpeningData {
 
         // Open the extension
         let mut ext_queries = self.ext.open_query(open_c1, open_c2);
+        // print!("\nsuffixopening: ");
+        // for x in ext_queries.iter() {
+        //     let mut comm_serialised = [0u8; 32];
+        //     x.commitment.serialize(&mut comm_serialised[..]).unwrap();
+        //     print!("{} ", hex::encode(comm_serialised));
+        // }
+        // println!("\n");
         // Open all suffices
         let mut suffice_queries = Vec::with_capacity(self.suffices.len());
         let stem_meta = self.ext.meta.into_stem();
 
         for (sfx, value) in &self.suffices {
+            println!("suffice: {} {:?}", sfx, value);
             let value_lower_index = 2 * (sfx % 128);
             let value_upper_index = value_lower_index + 1;
 
@@ -327,6 +336,13 @@ impl SuffixOpeningData {
             suffice_queries.push(open_at_val_low);
             suffice_queries.push(open_at_val_upper);
         }
+        // print!("\nsuffice_query: ");
+        // for x in suffice_queries.iter() {
+        //     let mut comm_serialised = [0u8; 32];
+        //     x.commitment.serialize(&mut comm_serialised[..]).unwrap();
+        //     print!("{} ", hex::encode(comm_serialised));
+        // }
+        // println!("\n");
         ext_queries.extend(suffice_queries);
         ext_queries
     }
